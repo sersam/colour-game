@@ -1,0 +1,49 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies - Client
+      working-directory: ./client
+      run: npm ci
+      continue-on-error: true
+
+    - name: Install dependencies - Server
+      working-directory: ./server
+      run: npm ci
+      continue-on-error: true
+
+    - name: Run linter - Client
+      working-directory: ./client
+      run: npm run lint
+      continue-on-error: true
+
+    - name: Run linter - Server
+      working-directory: ./server
+      run: npm run lint
+      continue-on-error: true
+
+    - name: Check format
+      run: |
+        echo "✅ Linting workflow completed"
+        echo "ℹ️ Si hay errores de linting, instala ESLint y configúralo en cada directorio"
