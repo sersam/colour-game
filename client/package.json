@@ -1,0 +1,22 @@
+{
+  "name": "colour-game-client",
+  "version": "1.0.0",
+  "description": "Cliente frontend del juego de colores",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Start dev server here\"",
+    "build": "echo \"Build client here\"",
+    "lint": "echo \"Add ESLint configuration\"",
+    "test": "echo \"Add tests here\""
+  },
+  "keywords": [
+    "game",
+    "color"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}
