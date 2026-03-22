@@ -1,0 +1,42 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+
+    - name: Install dependencies - Root
+      run: npm install
+
+    - name: Install dependencies - Client
+      working-directory: ./client
+      run: npm install
+
+    - name: Install dependencies - Server
+      working-directory: ./server
+      run: npm install
+
+    - name: Run linter - Client
+      working-directory: ./client
+      run: npm run lint
+
+    - name: Run linter - Server
+      working-directory: ./server
+      run: npm run lint
+
+    - name: Lint success
+      run: |
+        echo "✅ Linting workflow completed successfully"
