@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "echo \"Build client here\"",
-    "lint": "eslint . --eslintrc --ext .js,.jsx,.ts,.tsx",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "test": "echo \"Add tests here\""
   },
   "keywords": [
