@@ -1,11 +1,17 @@
+const { FlatCompat } = require('@eslint/eslintrc');
+const prettierPlugin = require('eslint-plugin-prettier');
+ 
+const compat = new FlatCompat();
+ 
 module.exports = [
+  ...compat.extends('expo', 'prettier'),
   {
-    extends: ['expo', 'prettier'],
     plugins: {
-      prettier: require('eslint-plugin-prettier'),
+      prettier: prettierPlugin,
     },
     rules: {
       'prettier/prettier': 'error',
     },
   },
 ];
+ 
