@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "build": "echo \"Build client here\"",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "test": "echo \"Add tests here\""
   },
   "keywords": [
@@ -38,9 +39,10 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
-    "eslint": "^10.2.0",
+    "eslint": "^9.0.0",
     "eslint-config-expo": "^55.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
