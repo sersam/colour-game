@@ -4,21 +4,79 @@
 
 1. Create a Spotify App at [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Get your Client ID from the app settings
-3. Add your redirect URI: `colourgame://redirect` in the app settings
+3. Get your correct redirect URI (see steps below)
 
-## Configuration
+## Configuration - Step by Step
+
+### Step 1: Register Redirect URIs in Spotify Dashboard
+
+Your app can work with different Redirect URIs depending on the environment. Register **all of these** in your Spotify app settings:
+
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Select your app
+3. Click "Edit Settings"
+4. Scroll to "Redirect URIs" section
+5. Add each URI (copy one, paste, click Add, repeat):
+
+**Required URIs:**
+```
+colourgame://redirect
+```
+
+**Optional - For advanced development scenarios:**
+```
+exp://127.0.0.1:19000
+exp://localhost:19000
+```
+
+6. Click "Save" at the bottom
+
+For more details on which URI to use, see [SPOTIFY_REDIRECT_URIS.md](./SPOTIFY_REDIRECT_URIS.md).
+
+### Step 2: Configure Environment Variables
 
 1. Copy `.env.example` to `.env`:
    ```bash
    cp .env.example .env
    ```
 
-2. Edit `.env` and replace `your_spotify_client_id_here` with your actual Spotify Client ID:
+2. Edit `.env` and add your Spotify Client ID:
    ```
-   SPOTIFY_CLIENT_ID=your_actual_client_id_here
+   SPOTIFY_CLIENT_ID=your_client_id_from_spotify_dashboard
    ```
 
-3. The app will automatically load the environment variables from the `.env` file.
+3. The app automatically loads these environment variables.
+
+### Step 3: Start the App and Test
+
+```bash
+npm start
+```
+
+Then:
+- Press `w` for web
+- Or press `i` for iOS simulator
+- Or press `a` for Android emulator
+
+Try the "Login with Spotify" button.
+
+## How It Works
+
+- **Development**: Uses Expo's proxy (`useProxy: true`) which creates a redirect URL like `https://auth.expo.io/@username/app-slug`
+- **Production**: Can be configured to use custom deep links like `colourgame://redirect` after building
+
+## Understanding the Redirect URI Error
+
+If you see this error:
+```
+Failed to launch 'colourgame://redirect/?code=...' because the scheme does not have a registered handler
+```
+
+It means the redirect URI in your Spotify app settings **doesn't match** what the app is trying to use. Always:
+
+1. Run the script to get the correct URI
+2. Register that exact URI in Spotify Dashboard
+3. Restart the app and try again
 
 ## Features Implemented
 
@@ -28,12 +86,14 @@
 - ✅ React Context for auth state management
 - ✅ Environment variable configuration (no secrets in code)
 - ✅ Cross-platform support (iOS, Android, Web) with `react-native-dotenv`
+- ✅ Expo proxy for reliable development OAuth flow
 
 ## Security Notes
 
 - The `.env` file is automatically ignored by Git (see `.gitignore`)
 - Never commit your actual `.env` file with real credentials
 - Use `.env.example` as a template for other developers
+- Redirect URIs are logged for debugging but never stored in code
 
 ## Usage
 

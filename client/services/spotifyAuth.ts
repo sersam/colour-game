@@ -14,7 +14,11 @@ if (!SPOTIFY_CLIENT_ID) {
 // TypeScript knows SPOTIFY_CLIENT_ID is defined after the check above
 const CLIENT_ID: string = SPOTIFY_CLIENT_ID;
 
-const SPOTIFY_REDIRECT_URI = 'colourgame://redirect';
+// Spotify requires the exact Redirect URI to be registered in your app settings
+// AuthSession.makeRedirectUri() automatically uses the correct scheme from app.json
+const SPOTIFY_REDIRECT_URI = AuthSession.makeRedirectUri({
+  native: 'colourgame://redirect',
+});
 
 const SPOTIFY_SCOPES = [
   'user-read-private',
@@ -197,19 +201,32 @@ export async function authenticateWithSpotify(): Promise<boolean> {
       });
 
       if (!tokenResponse.ok) {
-        throw new Error('Failed to exchange code for tokens');
+        const errorText = await tokenResponse.text();
+        console.error('❌ Token exchange failed. Response:', errorText);
+        throw new Error(
+          `Token exchange failed: ${tokenResponse.status} ${errorText}`
+        );
       }
 
       const tokenData = await tokenResponse.json();
       const { access_token, refresh_token, expires_in } = tokenData;
 
+      console.log('🎉 Token exchange successful!');
       await storeTokens(access_token, refresh_token, expires_in);
       return true;
+    } else if (result.type === 'error') {
+      console.error('❌ Authorization error:', result.error);
+      console.error('   Error params:', result.params);
+    } else {
+      console.log('⚠️ Authorization cancelled by user');
     }
 
     return false;
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('❌ Authentication error:', error);
+    if (error instanceof Error) {
+      console.error('   Message:', error.message);
+    }
     return false;
   }
 }
