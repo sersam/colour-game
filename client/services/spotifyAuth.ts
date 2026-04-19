@@ -20,6 +20,8 @@ const SPOTIFY_REDIRECT_URI = AuthSession.makeRedirectUri({
   useProxy: Platform.OS !== 'web',
 });
 
+console.log('Spotify Redirect URI:', SPOTIFY_REDIRECT_URI);
+
 const SPOTIFY_SCOPES = [
   'user-read-private',
   'user-read-email',
