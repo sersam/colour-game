@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-unresolved
 import { SPOTIFY_CLIENT_ID } from '@env';
+import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
@@ -14,7 +15,10 @@ if (!SPOTIFY_CLIENT_ID) {
 // TypeScript knows SPOTIFY_CLIENT_ID is defined after the check above
 const CLIENT_ID: string = SPOTIFY_CLIENT_ID;
 
-const SPOTIFY_REDIRECT_URI = 'colourgame://redirect';
+const SPOTIFY_REDIRECT_URI = AuthSession.makeRedirectUri({
+  native: 'colourgame://redirect',
+  useProxy: Platform.OS !== 'web',
+});
 
 const SPOTIFY_SCOPES = [
   'user-read-private',
@@ -176,9 +180,10 @@ export async function authenticateWithSpotify(): Promise<boolean> {
       prompt: AuthSession.Prompt.SelectAccount,
     });
 
-    const result = await request.promptAsync({
-      authorizationEndpoint: SPOTIFY_AUTH_URL,
-    });
+    const result = await request.promptAsync(
+      { authorizationEndpoint: SPOTIFY_AUTH_URL },
+      { useProxy: Platform.OS !== 'web' }
+    );
 
     if (result.type === 'success' && result.params.code) {
       // Exchange code for tokens
