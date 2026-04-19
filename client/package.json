@@ -20,7 +20,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=18.0.0",
     "npm": ">=8.0.0"
   },
   "dependencies": {
@@ -29,10 +29,14 @@
     "@types/react": "^19.2.14",
     "@types/react-native": "^0.73.0",
     "expo": "^55.0.12",
+    "expo-auth-session": "^55.0.14",
+    "expo-crypto": "^55.0.14",
+    "expo-secure-store": "^55.0.13",
     "expo-status-bar": "^55.0.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-native": "^0.85.0",
+    "react-native-dotenv": "^3.4.11",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-web": "^0.21.0",
