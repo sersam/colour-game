@@ -10,8 +10,13 @@ import {
   Alert,
   Image,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { searchSongs, SpotifyTrack } from '../services/spotifySearch';
+import {
+  isSpotifyAppInstalled,
+  playTrackInSpotify,
+} from '../services/spotifyRemote';
 
 interface SearchResult extends SpotifyTrack {
   hasPreview: boolean;
@@ -114,6 +119,34 @@ export default function SearchScreen() {
               {item.hasPreview ? '🎵 Preview Available' : '❌ No Preview'}
             </Text>
           </View>
+          {Platform.OS === 'ios' ? (
+            <TouchableOpacity
+              style={styles.spotifyPlayButton}
+              onPress={async () => {
+                try {
+                  const installed = await isSpotifyAppInstalled();
+
+                  if (!installed) {
+                    Alert.alert(
+                      'Spotify Required',
+                      'Install the Spotify app on your iPhone to play the full track.'
+                    );
+                    return;
+                  }
+
+                  await playTrackInSpotify(item.uri);
+                } catch (error) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : 'Unable to start playback in Spotify.';
+                  Alert.alert('Spotify Playback Error', message);
+                }
+              }}
+            >
+              <Text style={styles.spotifyPlayButtonText}>Play on Spotify</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     );
@@ -303,6 +336,19 @@ const styles = StyleSheet.create({
   previewUnavailable: {
     color: '#ff6b6b',
     backgroundColor: '#4d1a1a',
+  },
+  spotifyPlayButton: {
+    marginTop: 10,
+    backgroundColor: '#1DB954',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
+  spotifyPlayButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   emptyContainer: {
     alignItems: 'center',

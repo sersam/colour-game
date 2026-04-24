@@ -5,6 +5,7 @@ const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 export interface SpotifyTrack {
   id: string;
   name: string;
+  uri: string;
   artists: {
     name: string;
   }[];
@@ -30,6 +31,14 @@ export interface SpotifySearchResponse {
     offset: number;
   };
 }
+
+const RANDOM_TRACK_SEEDS = [
+  '11dFghVXANMlKmJXsNCQvf',
+  '3n3Ppam7vgaVa1iaRUc9Lp',
+  '7ouMYWpwJ422jRcDASZB7P',
+  '2takcwOaAZWiXQijPHIx7B',
+  '0VjIjW4GlUZAMYd2vXMi3b',
+];
 
 export interface SearchError {
   status: number;
@@ -69,6 +78,7 @@ export async function searchSongs(
     const url = new URL(`${SPOTIFY_API_BASE}/search`);
     url.searchParams.append('q', query);
     url.searchParams.append('type', 'track');
+    url.searchParams.append('market', 'from_token');
     url.searchParams.append('limit', Math.min(limit, 50).toString());
 
     const response = await fetch(url.toString(), {
@@ -137,9 +147,10 @@ export async function getTrackDetails(trackId: string): Promise<SpotifyTrack> {
   }
 
   try {
-    const url = `${SPOTIFY_API_BASE}/tracks/${trackId}`;
+    const url = new URL(`${SPOTIFY_API_BASE}/tracks/${trackId}`);
+    url.searchParams.append('market', 'from_token');
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -212,14 +223,23 @@ export async function getRecommendations(
   try {
     const url = new URL(`${SPOTIFY_API_BASE}/recommendations`);
     url.searchParams.append('seed_tracks', seedTracks.join(','));
+    url.searchParams.append('market', 'from_token');
     url.searchParams.append('limit', Math.min(limit, 100).toString());
+
+    console.log('Spotify recommendations request:', url.toString());
 
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
         'Content-Type': 'application/json',
       },
+    });
+
+    console.log('Spotify recommendations response:', {
+      status: response.status,
+      statusText: response.statusText,
     });
 
     if (response.status === 401) {
@@ -242,10 +262,12 @@ export async function getRecommendations(
     }
 
     if (!response.ok) {
-      throw new SpotifySearchError(
-        response.status,
-        `Failed to get recommendations: ${response.statusText}`
-      );
+      const errorBody = await response.text();
+      const errorMessage = `Failed to get recommendations: ${response.status} ${response.statusText}${
+        errorBody ? ` - ${errorBody}` : ''
+      }`;
+      console.error('Spotify recommendations error body:', errorBody);
+      throw new SpotifySearchError(response.status, errorMessage);
     }
 
     const data = (await response.json()) as { tracks: SpotifyTrack[] };
@@ -263,5 +285,24 @@ export async function getRecommendations(
     }
 
     throw new SpotifySearchError(0, 'Unknown error fetching recommendations');
+  }
+}
+
+export async function getRandomRecommendedTrack(): Promise<SpotifyTrack> {
+  try {
+    const tracks = await getRecommendations(RANDOM_TRACK_SEEDS, 20);
+
+    if (tracks.length === 0) {
+      throw new SpotifySearchError(404, 'No recommendation tracks available');
+    }
+
+    const randomIndex = Math.floor(Math.random() * tracks.length);
+    return tracks[randomIndex];
+  } catch (error) {
+    console.error('Recommendation request failed, falling back to a seed track:', error);
+
+    const fallbackTrackId =
+      RANDOM_TRACK_SEEDS[Math.floor(Math.random() * RANDOM_TRACK_SEEDS.length)];
+    return getTrackDetails(fallbackTrackId);
   }
 }
