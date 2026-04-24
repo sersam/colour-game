@@ -154,8 +154,14 @@ export async function authenticateWithSpotify(): Promise<boolean> {
       authorizationEndpoint: SPOTIFY_AUTH_URL,
     });
     console.log('Spotify auth URL:', authUrl);
-    console.log('Spotify code verifier present:', Boolean(request.codeVerifier));
-    console.log('Spotify redirect URI used for token exchange:', SPOTIFY_REDIRECT_URI);
+    console.log(
+      'Spotify code verifier present:',
+      Boolean(request.codeVerifier)
+    );
+    console.log(
+      'Spotify redirect URI used for token exchange:',
+      SPOTIFY_REDIRECT_URI
+    );
 
     const result = await request.promptAsync(
       { authorizationEndpoint: SPOTIFY_AUTH_URL },
