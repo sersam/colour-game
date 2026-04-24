@@ -1,8 +1,6 @@
 // eslint-disable-next-line import/no-unresolved
 import { SPOTIFY_CLIENT_ID } from '@env';
-import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
-import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 // Spotify OAuth configuration
@@ -16,8 +14,8 @@ if (!SPOTIFY_CLIENT_ID) {
 const CLIENT_ID: string = SPOTIFY_CLIENT_ID;
 
 const SPOTIFY_REDIRECT_URI = AuthSession.makeRedirectUri({
-  native: 'colourgame://redirect',
-  useProxy: Platform.OS !== 'web',
+  scheme: 'colourgame',
+  path: 'redirect',
 });
 
 console.log('Spotify Redirect URI:', SPOTIFY_REDIRECT_URI);
@@ -30,33 +28,6 @@ const SPOTIFY_SCOPES = [
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
-
-// Generate PKCE challenge
-async function generatePKCE() {
-  const verifier = await Crypto.getRandomBytesAsync(32);
-  const verifierString = base64URLEncode(verifier);
-
-  const challenge = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    verifierString
-  );
-  const challengeBytes = new Uint8Array(
-    challenge.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-  );
-  const challengeString = base64URLEncode(challengeBytes);
-
-  return { verifier: verifierString, challenge: challengeString };
-}
-
-// Base64 URL encode
-function base64URLEncode(arrayBuffer: ArrayBuffer | Uint8Array): string {
-  const bytes = new Uint8Array(arrayBuffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
 
 // Token storage keys
 const TOKEN_KEYS = {
@@ -170,24 +141,35 @@ export async function getValidAccessToken(): Promise<string | null> {
 // Spotify OAuth with PKCE
 export async function authenticateWithSpotify(): Promise<boolean> {
   try {
-    const { verifier, challenge } = await generatePKCE();
-
     const request = new AuthSession.AuthRequest({
       clientId: CLIENT_ID,
       scopes: SPOTIFY_SCOPES,
       responseType: AuthSession.ResponseType.Code,
       redirectUri: SPOTIFY_REDIRECT_URI,
-      codeChallenge: challenge,
-      codeChallengeMethod: AuthSession.CodeChallengeMethod.S256,
       prompt: AuthSession.Prompt.SelectAccount,
+      usePKCE: true,
     });
+
+    const authUrl = await request.makeAuthUrlAsync({
+      authorizationEndpoint: SPOTIFY_AUTH_URL,
+    });
+    console.log('Spotify auth URL:', authUrl);
+    console.log('Spotify code verifier present:', Boolean(request.codeVerifier));
+    console.log('Spotify redirect URI used for token exchange:', SPOTIFY_REDIRECT_URI);
 
     const result = await request.promptAsync(
       { authorizationEndpoint: SPOTIFY_AUTH_URL },
-      { useProxy: Platform.OS !== 'web' }
+      {}
     );
 
+    console.log('Spotify auth result type:', result.type);
+    console.log('Spotify auth result params:', result.params);
+
     if (result.type === 'success' && result.params.code) {
+      if (!request.codeVerifier) {
+        throw new Error('Spotify PKCE code verifier was not generated');
+      }
+
       // Exchange code for tokens
       const tokenResponse = await fetch(SPOTIFY_TOKEN_URL, {
         method: 'POST',
@@ -199,12 +181,19 @@ export async function authenticateWithSpotify(): Promise<boolean> {
           code: result.params.code,
           redirect_uri: SPOTIFY_REDIRECT_URI,
           client_id: CLIENT_ID,
-          code_verifier: verifier,
+          code_verifier: request.codeVerifier,
         }).toString(),
       });
 
       if (!tokenResponse.ok) {
-        throw new Error('Failed to exchange code for tokens');
+        const errorText = await tokenResponse.text();
+        console.error('Spotify token exchange failed:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          body: errorText,
+          redirectUri: SPOTIFY_REDIRECT_URI,
+        });
+        throw new Error(`Failed to exchange code for tokens: ${errorText}`);
       }
 
       const tokenData = await tokenResponse.json();
