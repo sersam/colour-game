@@ -26,6 +26,15 @@ type SessionPlayer = {
   playerName: string;
   joinedAt: string;
 };
+type ColorCard = {
+  id: string;
+  name: string;
+  hex: string;
+};
+type BoardCell = {
+  value: ColorCard | null;
+  isWildcard: boolean;
+};
 
 const redisClient = createClient({
   url: process.env.REDIS_URL || "redis://127.0.0.1:6379",
@@ -182,6 +191,93 @@ function generateSessionCode(length: number = SESSION_CODE_LENGTH): string {
   }).join("");
 }
 
+function hashStringToSeed(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRandom(seed: number): () => number {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleWithSeed<T>(array: T[], seed: number): T[] {
+  const copy = [...array];
+  const random = createSeededRandom(seed);
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+
+  return copy;
+}
+
+function generatePlayerBoard(
+  sessionId: string,
+  playerId: string,
+): BoardCell[][] {
+  const boardSize = 5;
+  const wildcardIndex = 2;
+  const colorCatalog: ColorCard[] = [
+    { id: "red-500", name: "Red", hex: "#EF4444" },
+    { id: "blue-500", name: "Blue", hex: "#3B82F6" },
+    { id: "green-500", name: "Green", hex: "#22C55E" },
+    { id: "yellow-500", name: "Yellow", hex: "#EAB308" },
+    { id: "purple-500", name: "Purple", hex: "#A855F7" },
+    { id: "orange-500", name: "Orange", hex: "#F97316" },
+    { id: "pink-500", name: "Pink", hex: "#EC4899" },
+    { id: "teal-500", name: "Teal", hex: "#14B8A6" },
+    { id: "indigo-500", name: "Indigo", hex: "#6366F1" },
+    { id: "lime-500", name: "Lime", hex: "#84CC16" },
+    { id: "cyan-500", name: "Cyan", hex: "#06B6D4" },
+    { id: "amber-500", name: "Amber", hex: "#F59E0B" },
+    { id: "emerald-500", name: "Emerald", hex: "#10B981" },
+    { id: "violet-500", name: "Violet", hex: "#8B5CF6" },
+    { id: "rose-500", name: "Rose", hex: "#F43F5E" },
+    { id: "sky-500", name: "Sky", hex: "#0EA5E9" },
+    { id: "fuchsia-500", name: "Fuchsia", hex: "#D946EF" },
+    { id: "stone-500", name: "Stone", hex: "#78716C" },
+    { id: "slate-500", name: "Slate", hex: "#64748B" },
+    { id: "zinc-500", name: "Zinc", hex: "#71717A" },
+    { id: "neutral-500", name: "Neutral", hex: "#737373" },
+    { id: "gray-500", name: "Gray", hex: "#6B7280" },
+    { id: "brown-500", name: "Brown", hex: "#A16207" },
+    { id: "mint-500", name: "Mint", hex: "#34D399" },
+    { id: "coral-500", name: "Coral", hex: "#FB7185" },
+    { id: "navy-500", name: "Navy", hex: "#1D4ED8" },
+    { id: "olive-500", name: "Olive", hex: "#65A30D" },
+    { id: "magenta-500", name: "Magenta", hex: "#C026D3" },
+    { id: "aqua-500", name: "Aqua", hex: "#2DD4BF" },
+    { id: "gold-500", name: "Gold", hex: "#FACC15" },
+  ];
+  const neededCells = boardSize * boardSize - 1;
+  const values = colorCatalog.slice(0, neededCells);
+  const seed = hashStringToSeed(`${sessionId}:${playerId}`);
+  const shuffledValues = shuffleWithSeed(values, seed);
+  let valuePointer = 0;
+
+  return Array.from({ length: boardSize }, (_, rowIndex) => {
+    return Array.from({ length: boardSize }, (_, columnIndex) => {
+      if (rowIndex === wildcardIndex && columnIndex === wildcardIndex) {
+        return { value: null, isWildcard: true };
+      }
+
+      const value = shuffledValues[valuePointer];
+      valuePointer += 1;
+      return { value, isWildcard: false };
+    });
+  });
+}
+
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -283,6 +379,7 @@ app.post("/sessions/:code/join", async (req, res) => {
     };
 
     const { isFull, playerCount } = await addPlayerToSession(sessionId, player);
+    const board = generatePlayerBoard(sessionId, player.playerId);
 
     if (isFull) {
       return res.status(409).json({
@@ -297,6 +394,7 @@ app.post("/sessions/:code/join", async (req, res) => {
       player,
       playerCount,
       maxPlayers: MAX_PLAYERS_PER_SESSION,
+      board,
     };
 
     io.to(sessionId).emit("player_joined", eventPayload);
