@@ -18,7 +18,10 @@
     "lint:server:fix": "cd server && npm run lint:fix",
     "test": "npm run test:client && npm run test:server",
     "test:client": "cd client && npm run test",
-    "test:server": "cd server && npm run test"
+    "test:server": "cd server && npm run test",
+    "redis:up": "docker compose up -d redis",
+    "redis:down": "docker compose stop redis",
+    "redis:logs": "docker compose logs -f redis"
   },
   "keywords": [
     "game",
