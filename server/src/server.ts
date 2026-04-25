@@ -524,7 +524,10 @@ app.post("/sessions/:code/join", async (req, res) => {
     }
 
     const players = await getSessionPlayers(sessionId);
-    const hostPlayerId = await getOrAssignHostPlayerId(sessionId, player.playerId);
+    const hostPlayerId = await getOrAssignHostPlayerId(
+      sessionId,
+      player.playerId,
+    );
     const isHost = hostPlayerId === player.playerId;
 
     const eventPayload = {

@@ -96,9 +96,8 @@ function HomeScreen() {
   const [sessionCode, setSessionCode] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
-  const [currentSession, setCurrentSession] = useState<JoinSessionResponse | null>(
-    null
-  );
+  const [currentSession, setCurrentSession] =
+    useState<JoinSessionResponse | null>(null);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [hostPlayerId, setHostPlayerId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -125,10 +124,7 @@ function HomeScreen() {
 
     socket.on(
       'session_players_updated',
-      (payload: {
-        players?: LobbyPlayer[];
-        hostPlayerId?: string;
-      }) => {
+      (payload: { players?: LobbyPlayer[]; hostPlayerId?: string }) => {
         if (payload.players) {
           setLobbyPlayers(payload.players);
         }
@@ -244,7 +240,9 @@ function HomeScreen() {
       <Text style={styles.title}>Colour Game</Text>
       {currentSession ? (
         <View style={styles.homeCard}>
-          <Text style={styles.subtitle}>Lobby de sala {currentSession.code}</Text>
+          <Text style={styles.subtitle}>
+            Lobby de sala {currentSession.code}
+          </Text>
           <Text style={styles.playerCounter}>
             Jugadores: {lobbyPlayers.length}/{MAX_PLAYERS_PER_SESSION}
           </Text>
@@ -270,7 +268,10 @@ function HomeScreen() {
             </TouchableOpacity>
 
             {isCurrentPlayerHost ? (
-              <TouchableOpacity style={styles.controlButton} onPress={handleStartGame}>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={handleStartGame}
+              >
                 <Text style={styles.controlButtonText}>Comenzar</Text>
               </TouchableOpacity>
             ) : null}
@@ -287,11 +288,15 @@ function HomeScreen() {
             <TextInput
               style={[
                 styles.codeInput,
-                !isSessionCodeValid && sessionCode ? styles.codeInputInvalid : null,
+                !isSessionCodeValid && sessionCode
+                  ? styles.codeInputInvalid
+                  : null,
               ]}
               value={sessionCode}
               onChangeText={(value) => {
-                const cleanedValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                const cleanedValue = value
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/g, '');
                 setSessionCode(cleanedValue.slice(0, 6));
               }}
               placeholder="ABC123"
