@@ -59,7 +59,10 @@ function getInMemorySession(code: string): string | null {
   return entry.sessionId;
 }
 
-async function saveSessionCode(code: string, sessionId: string): Promise<boolean> {
+async function saveSessionCode(
+  code: string,
+  sessionId: string,
+): Promise<boolean> {
   try {
     await ensureRedisConnected();
 
@@ -76,7 +79,7 @@ async function saveSessionCode(code: string, sessionId: string): Promise<boolean
 
     if (!loggedMemoryFallback) {
       console.warn(
-        "Redis unavailable, using in-memory session store (dev fallback)."
+        "Redis unavailable, using in-memory session store (dev fallback).",
       );
       loggedMemoryFallback = true;
     }
@@ -101,7 +104,7 @@ async function getSessionByCode(code: string): Promise<string | null> {
 
     if (!loggedMemoryFallback) {
       console.warn(
-        "Redis unavailable, using in-memory session store (dev fallback)."
+        "Redis unavailable, using in-memory session store (dev fallback).",
       );
       loggedMemoryFallback = true;
     }
@@ -112,7 +115,9 @@ async function getSessionByCode(code: string): Promise<string | null> {
 
 function generateSessionCode(length: number = SESSION_CODE_LENGTH): string {
   return Array.from({ length }, () => {
-    const randomIndex = Math.floor(Math.random() * SESSION_CODE_ALPHABET.length);
+    const randomIndex = Math.floor(
+      Math.random() * SESSION_CODE_ALPHABET.length,
+    );
     return SESSION_CODE_ALPHABET[randomIndex];
   }).join("");
 }
