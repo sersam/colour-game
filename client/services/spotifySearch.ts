@@ -87,7 +87,7 @@ async function getPopularRandomTrackFromSearch(
     const tracks = await searchSongs(query, RANDOM_SEARCH_LIMIT);
 
     const popularTracks = tracks.filter(
-      track => (track.popularity ?? 0) >= minPopularity
+      (track) => (track.popularity ?? 0) >= minPopularity
     );
 
     if (popularTracks.length > 0) {
