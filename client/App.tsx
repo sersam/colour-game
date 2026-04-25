@@ -1,8 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Alert,
+  Easing,
   Platform,
   StyleSheet,
   Text,
@@ -15,7 +17,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginScreen from './components/LoginScreen';
 import SearchScreen from './components/SearchScreen';
-import { getRandomRecommendedTrack } from './services/spotifySearch';
+import {
+  getRandomRecommendedTrack,
+  type SpotifyTrack,
+} from './services/spotifySearch';
 import {
   connectToSpotifyAppRemote,
   pauseSpotifyPlayback,
@@ -29,7 +34,32 @@ function HomeScreen() {
   const { accessToken, isSpotifyRemoteReady } = useAuth();
   const [isPlayingRandom, setIsPlayingRandom] = useState(false);
   const [isPausing, setIsPausing] = useState(false);
-  const [currentTrackName, setCurrentTrackName] = useState<string | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
+  const [isTrackCardFlipped, setIsTrackCardFlipped] = useState(false);
+  const flipAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(flipAnimation, {
+      toValue: isTrackCardFlipped ? 1 : 0,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [flipAnimation, isTrackCardFlipped]);
+
+  const frontRotation = flipAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  const backRotation = flipAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  const trackYear = currentTrack?.album.release_date
+    ? currentTrack.album.release_date.slice(0, 4)
+    : 'Unknown year';
 
   const handlePlayRandomSong = async () => {
     if (Platform.OS !== 'ios') {
@@ -40,6 +70,7 @@ function HomeScreen() {
       return;
     }
 
+    setIsTrackCardFlipped(false);
     setIsPlayingRandom(true);
 
     try {
@@ -50,9 +81,8 @@ function HomeScreen() {
       }
 
       await playTrackInSpotify(track.uri);
-      setCurrentTrackName(
-        `${track.name} - ${track.artists[0]?.name ?? 'Unknown artist'}`
-      );
+      setCurrentTrack(track);
+      setIsTrackCardFlipped(false);
     } catch (error) {
       const message =
         error instanceof Error
@@ -131,10 +161,42 @@ function HomeScreen() {
               style={styles.loader}
             />
           ) : null}
-          {currentTrackName ? (
-            <Text style={styles.nowPlayingText}>
-              Now playing: {currentTrackName}
-            </Text>
+          {currentTrack ? (
+            <TouchableOpacity
+              activeOpacity={0.95}
+              style={styles.trackCardTouchable}
+              onPress={() => setIsTrackCardFlipped((prev) => !prev)}
+            >
+              <View style={styles.trackCardContainer}>
+                <Animated.View
+                  style={[
+                    styles.trackCardFace,
+                    styles.trackCardFront,
+                    { transform: [{ rotateY: frontRotation }] },
+                  ]}
+                >
+                  <Text style={styles.noteIcon}>♪</Text>
+                  <Text style={styles.trackCardHint}>
+                    Tap to reveal song info
+                  </Text>
+                </Animated.View>
+                <Animated.View
+                  style={[
+                    styles.trackCardFace,
+                    styles.trackCardBack,
+                    { transform: [{ rotateY: backRotation }] },
+                  ]}
+                >
+                  <Text style={styles.trackCardTopText}>
+                    {currentTrack.artists[0]?.name ?? 'Unknown artist'}
+                  </Text>
+                  <Text style={styles.trackCardYear}>{trackYear}</Text>
+                  <Text style={styles.trackCardBottomText}>
+                    {currentTrack.name}
+                  </Text>
+                </Animated.View>
+              </View>
+            </TouchableOpacity>
           ) : null}
         </>
       ) : (
@@ -268,6 +330,76 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  trackCardTouchable: {
+    marginTop: 20,
+  },
+  trackCardContainer: {
+    width: 275,
+    height: 170,
+  },
+  trackCardFace: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#2f2f2f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    backfaceVisibility: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  trackCardFront: {
+    backgroundColor: '#181818',
+  },
+  trackCardBack: {
+    backgroundColor: '#1f1f1f',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  noteIcon: {
+    fontSize: 58,
+    color: '#1DB954',
+    textShadowColor: 'rgba(29, 185, 84, 0.35)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 10,
+  },
+  trackCardHint: {
+    color: '#d6d6d6',
+    marginTop: 10,
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  trackCardTopText: {
+    color: '#d8d8d8',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    width: '100%',
+  },
+  trackCardYear: {
+    color: '#fff',
+    fontSize: 56,
+    fontWeight: '800',
+    textAlign: 'center',
+    width: '100%',
+    lineHeight: 62,
+    letterSpacing: 1,
+  },
+  trackCardBottomText: {
+    color: '#d8d8d8',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    width: '100%',
   },
   tabBar: {
     backgroundColor: '#282828',
