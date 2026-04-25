@@ -5,16 +5,23 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 import {
   authenticateWithSpotify,
   isAuthenticated,
   logoutFromSpotify,
   getValidAccessToken,
 } from '../services/spotifyAuth';
+import {
+  connectToSpotifyAppRemote,
+  disconnectSpotifyAppRemote,
+  isSpotifyAppInstalled,
+} from '../services/spotifyRemote';
 
 interface AuthContextType {
   isLoggedIn: boolean;
   accessToken: string | null;
+  isSpotifyRemoteReady: boolean;
   login: () => Promise<boolean>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<string | null>;
@@ -37,6 +44,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isSpotifyRemoteReady, setIsSpotifyRemoteReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -50,23 +58,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = await getValidAccessToken();
       setAccessToken(token);
     }
+    setIsSpotifyRemoteReady(false);
     setIsLoading(false);
   };
 
   const login = async (): Promise<boolean> => {
     const success = await authenticateWithSpotify();
-    if (success) {
-      setIsLoggedIn(true);
-      const token = await getValidAccessToken();
-      setAccessToken(token);
+    if (!success) {
+      return false;
     }
-    return success;
+
+    setIsLoggedIn(true);
+    const token = await getValidAccessToken();
+    setAccessToken(token);
+
+    if (Platform.OS === 'ios') {
+      try {
+        const installed = await isSpotifyAppInstalled();
+
+        if (installed) {
+          await connectToSpotifyAppRemote();
+          setIsSpotifyRemoteReady(true);
+        } else {
+          setIsSpotifyRemoteReady(false);
+        }
+      } catch (error) {
+        console.error('Spotify App Remote setup failed:', error);
+        setIsSpotifyRemoteReady(false);
+      }
+    }
+
+    return true;
   };
 
   const logout = async () => {
+    if (Platform.OS === 'ios') {
+      try {
+        await disconnectSpotifyAppRemote();
+      } catch (error) {
+        console.error('Spotify App Remote disconnect failed:', error);
+      }
+    }
+
     await logoutFromSpotify();
     setIsLoggedIn(false);
     setAccessToken(null);
+    setIsSpotifyRemoteReady(false);
   };
 
   const refreshToken = async (): Promise<string | null> => {
@@ -93,6 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value: AuthContextType = {
     isLoggedIn,
     accessToken,
+    isSpotifyRemoteReady,
     login,
     logout,
     refreshToken,

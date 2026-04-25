@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Platform,
+} from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginScreen() {
@@ -38,10 +45,16 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Spotify Authentication</Text>
+      <Text style={styles.title}>Connect Spotify Once</Text>
       <Text style={styles.subtitle}>
-        Connect your Spotify account to access music features
+        Sign in once to search Spotify and control playback from the app
       </Text>
+      {Platform.OS === 'ios' ? (
+        <Text style={styles.helperText}>
+          If Spotify is installed on your iPhone, we will also connect App
+          Remote automatically.
+        </Text>
+      ) : null}
       <TouchableOpacity
         style={[styles.button, isLoading && styles.buttonDisabled]}
         onPress={handleLogin}
@@ -73,7 +86,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#B3B3B3',
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#8E8E8E',
+    textAlign: 'center',
     marginBottom: 30,
+    lineHeight: 18,
   },
   button: {
     backgroundColor: '#1DB954',

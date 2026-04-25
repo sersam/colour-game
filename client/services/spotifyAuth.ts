@@ -205,13 +205,22 @@ export async function authenticateWithSpotify(): Promise<boolean> {
       const tokenData = await tokenResponse.json();
       const { access_token, refresh_token, expires_in } = tokenData;
 
+      console.log('🎉 Token exchange successful!');
       await storeTokens(access_token, refresh_token, expires_in);
       return true;
+    } else if (result.type === 'error') {
+      console.error('❌ Authorization error:', result.error);
+      console.error('   Error params:', result.params);
+    } else {
+      console.log('⚠️ Authorization cancelled by user');
     }
 
     return false;
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('❌ Authentication error:', error);
+    if (error instanceof Error) {
+      console.error('   Message:', error.message);
+    }
     return false;
   }
 }
