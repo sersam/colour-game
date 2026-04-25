@@ -122,7 +122,7 @@ async function getSessionByCode(code: string): Promise<string | null> {
 
 async function addPlayerToSession(
   sessionId: string,
-  player: SessionPlayer
+  player: SessionPlayer,
 ): Promise<{
   isFull: boolean;
   playerCount: number;
@@ -132,7 +132,10 @@ async function addPlayerToSession(
   try {
     await ensureRedisConnected();
 
-    const alreadyInRoom = await redisClient.hExists(playersKey, player.playerId);
+    const alreadyInRoom = await redisClient.hExists(
+      playersKey,
+      player.playerId,
+    );
     const playerCount = await redisClient.hLen(playersKey);
 
     if (!alreadyInRoom && playerCount >= MAX_PLAYERS_PER_SESSION) {
@@ -151,7 +154,7 @@ async function addPlayerToSession(
 
     if (!loggedMemoryFallback) {
       console.warn(
-        "Redis unavailable, using in-memory session store (dev fallback)."
+        "Redis unavailable, using in-memory session store (dev fallback).",
       );
       loggedMemoryFallback = true;
     }
