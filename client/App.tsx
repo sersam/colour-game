@@ -70,6 +70,7 @@ function HomeScreen() {
       return;
     }
 
+    setIsTrackCardFlipped(false);
     setIsPlayingRandom(true);
 
     try {
