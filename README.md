@@ -19,6 +19,7 @@ colour-game/
 
 - Node.js 16+ y npm
 - Git
+- Docker (recomendado para Redis en local)
 
 ### Instalación y Ejecución
 
@@ -53,6 +54,19 @@ colour-game/
    npm run dev
    ```
 
+4. **Levantar Redis en local (recomendado)**
+   ```bash
+   # Desde la raíz del monorepo
+   npm run redis:up
+   ```
+
+   El backend usa por defecto `redis://127.0.0.1:6379`.
+   Si necesitas otra instancia, define `REDIS_URL` al arrancar el server:
+
+   ```bash
+   REDIS_URL=redis://<host>:<port> npm run dev:server
+   ```
+
 4. **Construir para producción**
    ```bash
    # Frontend
@@ -77,6 +91,11 @@ colour-game/
 - `npm run build` - Construye la aplicación para producción
 - `npm run lint` - Ejecuta linting del código
 - `npm test` - Ejecuta las pruebas
+
+### Redis (raíz)
+- `npm run redis:up` - Levanta Redis en Docker
+- `npm run redis:down` - Detiene Redis
+- `npm run redis:logs` - Muestra logs de Redis
 
 ## 🔄 Flujo de Trabajo
 
