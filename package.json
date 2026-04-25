@@ -42,5 +42,8 @@
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react-hooks": "^7.0.1"
+  },
+  "dependencies": {
+    "@react-navigation/native-stack": "^7.14.12"
   }
 }

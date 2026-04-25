@@ -6,6 +6,7 @@ export interface SpotifyTrack {
   id: string;
   name: string;
   uri: string;
+  popularity?: number;
   artists: {
     name: string;
   }[];
@@ -39,6 +40,9 @@ const RANDOM_TRACK_SEEDS = [
   '2takcwOaAZWiXQijPHIx7B',
   '0VjIjW4GlUZAMYd2vXMi3b',
 ];
+const MIN_RANDOM_TRACK_POPULARITY = 70;
+const RANDOM_SEARCH_ATTEMPTS = 6;
+const RANDOM_SEARCH_LIMIT = 50;
 
 export interface SearchError {
   status: number;
@@ -55,6 +59,47 @@ class SpotifySearchError extends Error {
     super(message);
     this.name = 'SpotifySearchError';
   }
+}
+
+function getRandomSearchQuery(): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+  const pick = () => alphabet[Math.floor(Math.random() * alphabet.length)];
+  const queryMode = Math.random();
+
+  if (queryMode < 0.4) {
+    return pick();
+  }
+
+  if (queryMode < 0.8) {
+    return `${pick()}${pick()}`;
+  }
+
+  const fromYear = 1970 + Math.floor(Math.random() * 55);
+  const toYear = Math.min(fromYear + 5, 2025);
+  return `year:${fromYear}-${toYear}`;
+}
+
+async function getPopularRandomTrackFromSearch(
+  minPopularity: number = MIN_RANDOM_TRACK_POPULARITY
+): Promise<SpotifyTrack> {
+  for (let attempt = 1; attempt <= RANDOM_SEARCH_ATTEMPTS; attempt += 1) {
+    const query = getRandomSearchQuery();
+    const tracks = await searchSongs(query, RANDOM_SEARCH_LIMIT);
+
+    const popularTracks = tracks.filter(
+      track => (track.popularity ?? 0) >= minPopularity
+    );
+
+    if (popularTracks.length > 0) {
+      const randomIndex = Math.floor(Math.random() * popularTracks.length);
+      return popularTracks[randomIndex];
+    }
+  }
+
+  throw new SpotifySearchError(
+    404,
+    `No random tracks found with popularity >= ${minPopularity}`
+  );
 }
 
 /**
@@ -223,10 +268,7 @@ export async function getRecommendations(
   try {
     const url = new URL(`${SPOTIFY_API_BASE}/recommendations`);
     url.searchParams.append('seed_tracks', seedTracks.join(','));
-    url.searchParams.append('market', 'from_token');
     url.searchParams.append('limit', Math.min(limit, 100).toString());
-
-    console.log('Spotify recommendations request:', url.toString());
 
     const response = await fetch(url.toString(), {
       method: 'GET',
@@ -235,11 +277,6 @@ export async function getRecommendations(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-    });
-
-    console.log('Spotify recommendations response:', {
-      status: response.status,
-      statusText: response.statusText,
     });
 
     if (response.status === 401) {
@@ -266,7 +303,6 @@ export async function getRecommendations(
       const errorMessage = `Failed to get recommendations: ${response.status} ${response.statusText}${
         errorBody ? ` - ${errorBody}` : ''
       }`;
-      console.error('Spotify recommendations error body:', errorBody);
       throw new SpotifySearchError(response.status, errorMessage);
     }
 
@@ -299,7 +335,28 @@ export async function getRandomRecommendedTrack(): Promise<SpotifyTrack> {
     const randomIndex = Math.floor(Math.random() * tracks.length);
     return tracks[randomIndex];
   } catch (error) {
-    console.error('Recommendation request failed, falling back to a seed track:', error);
+    // Some Spotify apps/tokens do not have access to /recommendations and return 404.
+    // Try broader random search before falling back to the static seed list.
+    try {
+      return await getPopularRandomTrackFromSearch();
+    } catch (searchFallbackError) {
+      if (error instanceof SpotifySearchError && error.status !== 404) {
+        console.warn(
+          'Recommendation request failed, falling back to random search:',
+          error.message
+        );
+      }
+
+      if (
+        searchFallbackError instanceof SpotifySearchError &&
+        searchFallbackError.status !== 404
+      ) {
+        console.warn(
+          'Random search fallback failed, using a seed track:',
+          searchFallbackError.message
+        );
+      }
+    }
 
     const fallbackTrackId =
       RANDOM_TRACK_SEEDS[Math.floor(Math.random() * RANDOM_TRACK_SEEDS.length)];
