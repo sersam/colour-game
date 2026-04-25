@@ -24,6 +24,7 @@ type MemorySessionValue = {
 type SessionPlayer = {
   playerId: string;
   playerName: string;
+  avatar: string;
   joinedAt: string;
 };
 type ColorCard = {
@@ -41,6 +42,7 @@ const redisClient = createClient({
 });
 const inMemorySessions = new Map<string, MemorySessionValue>();
 const inMemorySessionPlayers = new Map<string, Map<string, SessionPlayer>>();
+const inMemorySessionHosts = new Map<string, string>();
 let loggedMemoryFallback = false;
 
 redisClient.on("error", (error) => {
@@ -182,6 +184,77 @@ async function addPlayerToSession(
   }
 }
 
+async function getSessionPlayers(sessionId: string): Promise<SessionPlayer[]> {
+  const playersKey = `session:players:${sessionId}`;
+
+  try {
+    await ensureRedisConnected();
+    const rawPlayers = await redisClient.hGetAll(playersKey);
+
+    const parsedPlayers = Object.values(rawPlayers)
+      .map((value) => {
+        try {
+          return JSON.parse(value) as SessionPlayer;
+        } catch {
+          return null;
+        }
+      })
+      .filter((player): player is SessionPlayer => player !== null)
+      .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+
+    return parsedPlayers;
+  } catch (error) {
+    if (!ENABLE_MEMORY_FALLBACK) {
+      throw error;
+    }
+
+    const players = inMemorySessionPlayers.get(sessionId);
+    if (!players) {
+      return [];
+    }
+
+    return Array.from(players.values()).sort((a, b) =>
+      a.joinedAt.localeCompare(b.joinedAt),
+    );
+  }
+}
+
+async function getOrAssignHostPlayerId(
+  sessionId: string,
+  fallbackPlayerId: string,
+): Promise<string> {
+  const hostKey = `session:host:${sessionId}`;
+
+  try {
+    await ensureRedisConnected();
+    const existingHost = await redisClient.get(hostKey);
+
+    if (existingHost) {
+      return existingHost;
+    }
+
+    await redisClient.set(hostKey, fallbackPlayerId, {
+      EX: SESSION_CODE_TTL_SECONDS,
+      NX: true,
+    });
+
+    const hostAfterSet = await redisClient.get(hostKey);
+    return hostAfterSet || fallbackPlayerId;
+  } catch (error) {
+    if (!ENABLE_MEMORY_FALLBACK) {
+      throw error;
+    }
+
+    const existingHost = inMemorySessionHosts.get(sessionId);
+    if (existingHost) {
+      return existingHost;
+    }
+
+    inMemorySessionHosts.set(sessionId, fallbackPlayerId);
+    return fallbackPlayerId;
+  }
+}
+
 function generateSessionCode(length: number = SESSION_CODE_LENGTH): string {
   return Array.from({ length }, () => {
     const randomIndex = Math.floor(
@@ -191,6 +264,47 @@ function generateSessionCode(length: number = SESSION_CODE_LENGTH): string {
   }).join("");
 }
 
+const AVATARS = [
+  "🦊",
+  "🐼",
+  "🐸",
+  "🦁",
+  "🐯",
+  "🐵",
+  "🐙",
+  "🐧",
+  "🦄",
+  "🐻",
+  "🐨",
+  "🦉",
+];
+
+const NICK_ADJECTIVES = [
+  "Brave",
+  "Swift",
+  "Lucky",
+  "Neon",
+  "Nova",
+  "Chill",
+  "Cosmic",
+  "Pixel",
+  "Sunny",
+  "Turbo",
+];
+
+const NICK_NOUNS = [
+  "Fox",
+  "Panda",
+  "Tiger",
+  "Otter",
+  "Comet",
+  "Falcon",
+  "Koala",
+  "Lynx",
+  "Wolf",
+  "Raven",
+];
+
 function hashStringToSeed(input: string): number {
   let hash = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
@@ -198,6 +312,22 @@ function hashStringToSeed(input: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+function generateAutoPlayerProfile(playerId: string): {
+  playerName: string;
+  avatar: string;
+} {
+  const seed = hashStringToSeed(playerId);
+  const adjective = NICK_ADJECTIVES[seed % NICK_ADJECTIVES.length];
+  const noun = NICK_NOUNS[(seed >>> 4) % NICK_NOUNS.length];
+  const suffix = ((seed >>> 8) % 90) + 10;
+  const avatar = AVATARS[(seed >>> 12) % AVATARS.length];
+
+  return {
+    playerName: `${adjective}${noun}${suffix}`,
+    avatar,
+  };
 }
 
 function createSeededRandom(seed: number): () => number {
@@ -370,11 +500,16 @@ app.post("/sessions/:code/join", async (req, res) => {
     const body = req.body as {
       playerId?: string;
       playerName?: string;
+      avatar?: string;
     };
 
+    const playerId = body.playerId?.trim() || randomUUID();
+    const autoProfile = generateAutoPlayerProfile(playerId);
+
     const player: SessionPlayer = {
-      playerId: body.playerId?.trim() || randomUUID(),
-      playerName: body.playerName?.trim() || "Player",
+      playerId,
+      playerName: body.playerName?.trim() || autoProfile.playerName,
+      avatar: body.avatar?.trim() || autoProfile.avatar,
       joinedAt: new Date().toISOString(),
     };
 
@@ -388,16 +523,31 @@ app.post("/sessions/:code/join", async (req, res) => {
       });
     }
 
+    const players = await getSessionPlayers(sessionId);
+    const hostPlayerId = await getOrAssignHostPlayerId(sessionId, player.playerId);
+    const isHost = hostPlayerId === player.playerId;
+
     const eventPayload = {
       sessionId,
       code: normalizedCode,
       player,
+      players,
       playerCount,
       maxPlayers: MAX_PLAYERS_PER_SESSION,
+      hostPlayerId,
+      isHost,
       board,
     };
 
     io.to(sessionId).emit("player_joined", eventPayload);
+    io.to(sessionId).emit("session_players_updated", {
+      sessionId,
+      code: normalizedCode,
+      players,
+      playerCount,
+      maxPlayers: MAX_PLAYERS_PER_SESSION,
+      hostPlayerId,
+    });
 
     return res.status(200).json(eventPayload);
   } catch (error) {
@@ -413,12 +563,30 @@ app.post("/sessions/:code/join", async (req, res) => {
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  socket.on("join_session_room", (sessionId: string) => {
+  socket.on("join_session_room", async (sessionId: string) => {
     if (!sessionId || typeof sessionId !== "string") {
       return;
     }
 
     socket.join(sessionId);
+
+    try {
+      const players = await getSessionPlayers(sessionId);
+      const hostPlayerId =
+        players.length > 0
+          ? await getOrAssignHostPlayerId(sessionId, players[0].playerId)
+          : null;
+
+      socket.emit("session_players_updated", {
+        sessionId,
+        players,
+        playerCount: players.length,
+        maxPlayers: MAX_PLAYERS_PER_SESSION,
+        hostPlayerId,
+      });
+    } catch (error) {
+      console.error("Failed to sync room players:", error);
+    }
   });
 
   // Handle ping from client
